@@ -1,0 +1,11 @@
+[package]
+name = "mount"
+version = "0.1.0"
+authors = ["Igor Bykov <igorb.dev@websm.io>"]
+edition = "2018"
+
+[dependencies]
+libc = "*"
+
+[build-dependencies]
+bindgen = "*"
