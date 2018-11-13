@@ -127,35 +127,25 @@ pub fn mount_nullfs<P: Into<MntParam>>(target: P, mount_point: P, flags: Option<
 
     }
 
-pub fn mount_procfs<P: Into<MntParam>>(mount_point: P, flags: Option<i32>)
-    -> Result<(), Box<Error>> {
+macro_rules! new_mount {
+    ($fn_name:ident, $fs_type:expr) => {
 
-        let mut params: HashMap<MntParam, MntParam> = HashMap::new();
-        params.insert("fstype".into(), "procfs".into());
-        params.insert("fspath".into(), mount_point.into());
+        pub fn $fn_name<P: Into<MntParam>>(mount_point: P, flags: Option<i32>)
+            -> Result<(), Box<Error>> {
 
-        nmount(params, flags)
+                let mut params: HashMap<MntParam, MntParam> = HashMap::new();
+                params.insert("fstype".into(), $fs_type.into());
+                params.insert("fspath".into(), mount_point.into());
 
-    }
+                nmount(params, flags)
 
-pub fn mount_devfs<P: Into<MntParam>>(mount_point: P, flags: Option<i32>)
-    -> Result<(), Box<Error>> {
-
-        let mut params: HashMap<MntParam, MntParam> = HashMap::new();
-        params.insert("fstype".into(), "devfs".into());
-        params.insert("fspath".into(), mount_point.into());
-
-        nmount(params, flags)
+            }
 
     }
+}
 
-pub fn mount_fdescfs<P: Into<MntParam>>(mount_point: P, flags: Option<i32>)
-    -> Result<(), Box<Error>> {
+new_mount!(mount_procfs, "procfs");
 
-        let mut params: HashMap<MntParam, MntParam> = HashMap::new();
-        params.insert("fstype".into(), "fdescfs".into());
-        params.insert("fspath".into(), mount_point.into());
+new_mount!(mount_devfs, "devfs");
 
-        nmount(params, flags)
-
-    }
+new_mount!(mount_fdescfs, "fdescfs");
