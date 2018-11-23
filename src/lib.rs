@@ -117,10 +117,15 @@ pub fn unmount(dir: impl Into<String>, flags: Option<i32>) -> Result<(), Box<Err
 
 }
 
-pub fn mount_nullfs<P: Into<MntParam>>(target: P, mount_point: P, flags: Option<i32>)
+pub fn mount_nullfs<P: Into<MntParam>>(target: P, mount_point: P, options: Option<MntParams>, flags: Option<i32>)
     -> Result<(), Box<Error>> {
 
         let mut params: MntParams = HashMap::new();
+
+        if let Some(options) = options {
+            params.extend(options);
+        }
+
         params.insert("fstype".into(), "nullfs".into());
         params.insert("fspath".into(), mount_point.into());
         params.insert("target".into(), target.into());
