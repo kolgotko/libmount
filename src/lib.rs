@@ -7,6 +7,8 @@ use std::io::Error as IoError;
 
 pub mod libc_mount;
 
+pub type MntParams = HashMap<MntParam, MntParam>;
+
 #[derive(Hash, PartialEq, Eq, Debug)]
 pub enum MntParam {
     CString(CString),
@@ -71,7 +73,7 @@ impl AsIovec for HashMap<MntParam, MntParam> {
     }
 }
 
-pub fn nmount(params: HashMap<MntParam, MntParam>, flags: Option<i32>) -> Result<(), Box<Error>> {
+pub fn nmount(params: MntParams, flags: Option<i32>) -> Result<(), Box<Error>> {
 
     let iovec_params = params.as_iovec();
 
@@ -118,7 +120,7 @@ pub fn unmount(dir: impl Into<String>, flags: Option<i32>) -> Result<(), Box<Err
 pub fn mount_nullfs<P: Into<MntParam>>(target: P, mount_point: P, flags: Option<i32>)
     -> Result<(), Box<Error>> {
 
-        let mut params: HashMap<MntParam, MntParam> = HashMap::new();
+        let mut params: MntParams = HashMap::new();
         params.insert("fstype".into(), "nullfs".into());
         params.insert("fspath".into(), mount_point.into());
         params.insert("target".into(), target.into());
@@ -130,10 +132,15 @@ pub fn mount_nullfs<P: Into<MntParam>>(target: P, mount_point: P, flags: Option<
 macro_rules! new_mount {
     ($fn_name:ident, $fs_type:expr) => {
 
-        pub fn $fn_name<P: Into<MntParam>>(mount_point: P, flags: Option<i32>)
+        pub fn $fn_name<P: Into<MntParam>>(mount_point: P, options: Option<MntParams>, flags: Option<i32>)
             -> Result<(), Box<Error>> {
 
                 let mut params: HashMap<MntParam, MntParam> = HashMap::new();
+
+                if let Some(options) = options {
+                    params.extend(options);
+                }
+
                 params.insert("fstype".into(), $fs_type.into());
                 params.insert("fspath".into(), mount_point.into());
 
@@ -149,3 +156,16 @@ new_mount!(mount_procfs, "procfs");
 new_mount!(mount_devfs, "devfs");
 
 new_mount!(mount_fdescfs, "fdescfs");
+
+#[macro_export]
+macro_rules! mount_options {
+    ({ $($key:expr => $value:expr),+ }) => {
+        {
+            let mut options: MntParams = HashMap::new();
+            $(
+                options.insert($key.into(), $value.into());
+            )+
+            Some(options)
+        }
+    }
+}
