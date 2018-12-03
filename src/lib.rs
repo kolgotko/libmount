@@ -1,13 +1,50 @@
+#![feature(try_from)]
+
 extern crate libc;
 
 use std::ffi::*;
 use std::error::Error;
 use std::collections::HashMap;
-use std::io::Error as IoError;
+use std::io::Error as IOError;
+use std::convert::{ TryFrom, TryInto };
+use std::fmt;
 
 pub mod libc_mount;
 
 pub type MntParams = HashMap<MntParam, MntParam>;
+
+#[derive(Debug)]
+pub enum LibMountError {
+    IOError(IOError),
+    NulError(NulError),
+}
+
+impl fmt::Display for LibMountError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            LibMountError::IOError(error) => {
+                error.fmt(f)
+            },
+            LibMountError::NulError(error) => {
+                error.fmt(f)
+            },
+        }
+    }
+}
+
+impl Error for LibMountError {}
+
+impl From<IOError> for LibMountError {
+    fn from(value: IOError) -> LibMountError {
+        LibMountError::IOError(value)
+    }
+}
+
+impl From<NulError> for LibMountError {
+    fn from(value: NulError) -> LibMountError {
+        LibMountError::NulError(value)
+    }
+}
 
 #[derive(Hash, PartialEq, Eq, Debug)]
 pub enum MntParam {
@@ -40,15 +77,19 @@ impl MntParam {
 
 }
 
-impl From<String> for MntParam {
-    fn from(value: String) -> MntParam {
-        MntParam::CString(CString::new(value).unwrap())
+impl TryFrom<String> for MntParam {
+    type Error = NulError;
+
+    fn try_from(value: String) -> Result<MntParam, Self::Error> {
+        Ok(MntParam::CString(CString::new(value)?))
     }
 }
 
-impl From<&str> for MntParam {
-    fn from(value: &str) -> MntParam {
-        MntParam::CString(CString::new(value).unwrap())
+impl TryFrom<&str> for MntParam {
+    type Error = NulError;
+
+    fn try_from(value: &str) -> Result<MntParam, Self::Error> {
+        Ok(MntParam::CString(CString::new(value)?))
     }
 }
 
@@ -73,7 +114,7 @@ impl AsIovec for HashMap<MntParam, MntParam> {
     }
 }
 
-pub fn nmount(params: MntParams, flags: Option<i32>) -> Result<(), Box<Error>> {
+pub fn nmount(params: MntParams, flags: Option<i32>) -> Result<(), LibMountError> {
 
     let iovec_params = params.as_iovec();
 
@@ -88,14 +129,14 @@ pub fn nmount(params: MntParams, flags: Option<i32>) -> Result<(), Box<Error>> {
     };
 
     if result < 0 {
-        Err(IoError::last_os_error())?
+        Err(IOError::last_os_error())?
     } else {
         Ok(())
     }
 
 }
 
-pub fn unmount(dir: impl Into<String>, flags: Option<i32>) -> Result<(), Box<Error>> {
+pub fn unmount(dir: impl Into<String>, flags: Option<i32>) -> Result<(), LibMountError> {
 
     let dir = CString::new(dir.into())?;
 
@@ -110,15 +151,16 @@ pub fn unmount(dir: impl Into<String>, flags: Option<i32>) -> Result<(), Box<Err
     };
 
     if result < 0 {
-        Err(IoError::last_os_error())?
+        Err(IOError::last_os_error())?
     } else {
         Ok(())
     }
 
 }
 
-pub fn mount_nullfs<P: Into<MntParam>>(target: P, mount_point: P, options: Option<MntParams>, flags: Option<i32>)
-    -> Result<(), Box<Error>> {
+pub fn mount_nullfs<P>(target: P, mount_point: P, options: Option<MntParams>, flags: Option<i32>)
+    -> Result<(), LibMountError> 
+    where P: TryInto<MntParam, Error=LibMountError> {
 
         let mut params: MntParams = HashMap::new();
 
@@ -126,9 +168,9 @@ pub fn mount_nullfs<P: Into<MntParam>>(target: P, mount_point: P, options: Optio
             params.extend(options);
         }
 
-        params.insert("fstype".into(), "nullfs".into());
-        params.insert("fspath".into(), mount_point.into());
-        params.insert("target".into(), target.into());
+        params.insert("fstype".try_into()?, "nullfs".try_into()?);
+        params.insert("fspath".try_into()?, mount_point.try_into().unwrap());
+        params.insert("target".try_into()?, target.try_into()?);
 
         nmount(params, flags)
 
@@ -137,8 +179,9 @@ pub fn mount_nullfs<P: Into<MntParam>>(target: P, mount_point: P, options: Optio
 macro_rules! new_mount {
     ($fn_name:ident, $fs_type:expr) => {
 
-        pub fn $fn_name<P: Into<MntParam>>(mount_point: P, options: Option<MntParams>, flags: Option<i32>)
-            -> Result<(), Box<Error>> {
+        pub fn $fn_name<P>(mount_point: P, options: Option<MntParams>, flags: Option<i32>)
+            -> Result<(), LibMountError> 
+            where P: TryInto<MntParam, Error=LibMountError> {
 
                 let mut params: HashMap<MntParam, MntParam> = HashMap::new();
 
@@ -146,8 +189,8 @@ macro_rules! new_mount {
                     params.extend(options);
                 }
 
-                params.insert("fstype".into(), $fs_type.into());
-                params.insert("fspath".into(), mount_point.into());
+                params.insert("fstype".try_into()?, $fs_type.try_into()?);
+                params.insert("fspath".try_into()?, mount_point.try_into()?);
 
                 nmount(params, flags)
 
@@ -168,7 +211,7 @@ macro_rules! mount_options {
         {
             let mut options: MntParams = HashMap::new();
             $(
-                options.insert($key.into(), $value.into());
+                options.insert($key.try_into()?, $value.try_into()?);
             )+
             Some(options)
         }
