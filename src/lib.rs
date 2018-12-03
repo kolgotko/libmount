@@ -209,11 +209,15 @@ new_mount!(mount_fdescfs, "fdescfs");
 macro_rules! mount_options {
     ({ $($key:expr => $value:expr),+ }) => {
         {
-            let mut options: MntParams = HashMap::new();
-            $(
-                options.insert($key.try_into()?, $value.try_into()?);
-            )+
-            Some(options)
+            let closure = || -> Result<Option<MntParams>, LibMountError> {
+                let mut options: MntParams = HashMap::new();
+                $(
+                    options.insert($key.try_into()?, $value.try_into()?);
+                )+
+                Ok(Some(options))
+            };
+
+            closure()
         }
     }
 }
