@@ -160,7 +160,7 @@ pub fn unmount(dir: impl Into<String>, flags: Option<i32>) -> Result<(), LibMoun
 
 pub fn mount_nullfs<P>(target: P, mount_point: P, options: Option<MntParams>, flags: Option<i32>)
     -> Result<(), LibMountError> 
-    where P: TryInto<MntParam, Error=LibMountError> {
+    where P: TryInto<MntParam, Error=NulError> {
 
         let mut params: MntParams = HashMap::new();
 
@@ -169,7 +169,7 @@ pub fn mount_nullfs<P>(target: P, mount_point: P, options: Option<MntParams>, fl
         }
 
         params.insert("fstype".try_into()?, "nullfs".try_into()?);
-        params.insert("fspath".try_into()?, mount_point.try_into().unwrap());
+        params.insert("fspath".try_into()?, mount_point.try_into()?);
         params.insert("target".try_into()?, target.try_into()?);
 
         nmount(params, flags)
@@ -180,8 +180,8 @@ macro_rules! new_mount {
     ($fn_name:ident, $fs_type:expr) => {
 
         pub fn $fn_name<P>(mount_point: P, options: Option<MntParams>, flags: Option<i32>)
-            -> Result<(), LibMountError> 
-            where P: TryInto<MntParam, Error=LibMountError> {
+            -> Result<(), LibMountError>
+            where P: TryInto<MntParam, Error=NulError> {
 
                 let mut params: HashMap<MntParam, MntParam> = HashMap::new();
 
