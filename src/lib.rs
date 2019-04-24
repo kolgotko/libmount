@@ -1,5 +1,3 @@
-#![feature(try_from)]
-
 extern crate libc;
 
 use std::ffi::*;
